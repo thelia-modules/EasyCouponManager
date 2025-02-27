@@ -1,0 +1,12 @@
+{
+  "name": "your-vendor/easy-coupon-manager-module",
+  "description": "EasyCouponManager module for Thelia",
+  "license": "LGPL-3.0-or-later",
+  "type": "thelia-module",
+  "require": {
+    "thelia/installer": "~1.1"
+  },
+  "extra": {
+    "installer-name": "EasyCouponManager"
+  }
+}

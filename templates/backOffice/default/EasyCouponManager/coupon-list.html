@@ -1,0 +1,510 @@
+{extends file="admin-layout.tpl"}
+
+{block name="check-resource"}admin.coupon{/block}
+{block name="check-access"}view{/block}
+{block name="page-title"}Gestion des coupons avec EasyCouponManager{/block}
+
+{block name="after-admin-css"}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.16/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2-bootstrap-css/1.4.6/select2-bootstrap.min.css" rel="stylesheet" />
+<style>
+    {literal}
+    .js-list {
+        width: 100% !important;
+    }
+    .js-animate-info-button {
+        animation: AnimateInfoButton 2s infinite;
+    }
+    @keyframes AnimateInfoButton {
+        0% {opacity: 1;}
+        50% {opacity: 0;}
+        100% {opacity: 1;}
+    }
+    {/literal}
+</style>
+{/block}
+
+{block name="main-content"}
+<div id="module-easy-coupon-manager">
+
+    <div id="wrapper" class="container">
+        <div class="row">
+            <div class="col-md-12 general-block-decorator">
+
+                <div class="row">
+                    <!-- Recherche par code -->
+                    <div class="col-md-2 filter">
+                        <div class="form-group">
+                            <label for="js-input-search">Rechercher un coupon</label>
+                            <input type="text" class="form-control js-refresh-table" id="js-input-search" placeholder="Code du coupon">
+                        </div>
+                    </div>
+
+                    <!-- Filtrer par statut -->
+                    <div class="col-md-2 filter">
+                        <div class="form-group">
+                            <label for="js-input-status">Statut</label>
+                            <select id="js-input-status" class="form-control js-refresh-table">
+                                <option value="">Tous</option>
+                                <option value="active">Actif</option>
+                                <option value="inactive">Inactif</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Filtrer par date de début -->
+                    <div class="col-md-2 filter">
+                        <div class="form-group">
+                            <label for="js-input-start-date">Date de début</label>
+                            <input type="date" class="form-control js-refresh-table" id="js-input-start-date">
+                        </div>
+                    </div>
+
+                    <!-- Filtrer par date d'expiration -->
+                    <div class="col-md-2 filter">
+                        <div class="form-group">
+                            <label for="js-input-expiration-date">Date d'expiration</label>
+                            <input type="date" class="form-control js-refresh-table" id="js-input-expiration-date">
+                        </div>
+                    </div>
+
+                    <!-- Filtrer par jours restants avant expiration -->
+                    <div class="col-md-2 filter">
+                        <div class="form-group">
+                            <label for="js-input-days-left">Jours avant expiration</label>
+                            <select id="js-input-days-left" class="form-control js-refresh-table">
+                                <option value="">Tous</option>
+                                <option value="0">Expiré</option>
+                                <option value="1-7">1 à 7 jours</option>
+                                <option value="8-30">8 à 30 jours</option>
+                                <option value="31">Plus de 30 jours</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Filtrer par utilisations restantes -->
+                    <div class="col-md-2 filter">
+                        <div class="form-group">
+                            <label for="js-input-usage-left">Utilisations restantes</label>
+                            <select id="js-input-usage-left" class="form-control js-refresh-table">
+                                <option value="">Tous</option>
+                                <option value="-1">Illimité</option>
+                                <option value="1-10">1 à 10</option>
+                                <option value="11-50">11 à 50</option>
+                                <option value="0">Épuisé</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Boutons d'actions -->
+                    <div class="col-md-3 filter">
+                        <div class="form-group">
+                            <button id="delete-selected-items" class="btn btn-block btn-danger">Supprimer les coupons sélectionnés</button>
+                        </div>
+                    </div>
+                    <div class="col-md-3 filter">
+                        <div class="form-group">
+                            <button id="activate-selected-items" class="btn btn-block btn-success">Activer les coupons sélectionnés</button>
+                        </div>
+                    </div>
+                    <div class="col-md-3 filter">
+                        <div class="form-group">
+                            <button id="deactivate-selected-items" class="btn btn-block btn-warning">Désactiver les coupons sélectionnés</button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3 filter">
+                        <div class="form-group text-right">
+                            {hook name="coupon.list-caption" location="coupon_list_caption"}
+
+                            {include file='renderer/buttons.html' btn_group=false buttons=[
+                            [
+                            'type' => 'create',
+                            'class' => 'btn btn-primary',
+                            'title' => {intl l='Créer un nouveau coupon'},
+                            'href' => {url path='/admin/coupon/create'},
+                            'auth' => ['resource' => 'admin.coupon'],
+                            'data' => [
+                            'toggle' => 'modal'
+                            ]
+                            ]
+                            ]}
+                        </div>
+                    </div>
+
+                    <!-- Tableau des coupons -->
+                    <div class="col-md-12 filter">
+                        <table class="js-list table table-striped table-bordered">
+                            <thead>
+                            <tr>
+                                {foreach from=$columnsDefinition item=definition}
+                                <td>{$definition.title nofilter}</td>
+                                {/foreach}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de confirmation de suppression -->
+    <div class="modal fade" id="modal-delete-selected" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Supprimer les coupons sélectionnés</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    Êtes-vous sûr de vouloir supprimer les coupons sélectionnés ?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-selected">Supprimer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--  Modale de confirmation pour l'activation -->
+    <div class="modal fade" id="modal-activate-selected" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Activer les coupons sélectionnés</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fermer">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    Êtes-vous sûr de vouloir <strong>activer</strong> les coupons sélectionnés ?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-success" id="confirm-activate-selected">Activer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--  Modale de confirmation pour la désactivation -->
+    <div class="modal fade" id="modal-deactivate-selected" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Désactiver les coupons sélectionnés</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fermer">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    Êtes-vous sûr de vouloir <strong>désactiver</strong> les coupons sélectionnés ?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-warning" id="confirm-deactivate-selected">Désactiver</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+{/block}
+
+{block name="javascript-last-call"}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/dataTables.bootstrap.min.js"></script>
+
+<script>
+    "use strict";
+
+    (function($, $module) {
+
+        // Déclaration de la DataTable
+        var table = $module.find('.js-list').DataTable({
+            processing: true,
+            serverSide: true,
+            searching: false,
+            lengthChange: true,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            order: [[1, "desc"]],
+            ajax: {
+                url: "{url current=true}",
+                method: 'POST',
+                data: function (data) {
+
+                    data.filter = {
+                        country: $module.find('#js-input-country').val(),
+                        lang: $module.find('#js-input-lang').val(),
+                        category: $module.find('#js-input-category').val(),
+                        brand: $module.find('#js-input-brand').val(),
+                        visible: $module.find('#js-input-visible').val(),
+                        newness: $module.find('#js-input-newness').val(),
+                        promotion: $module.find('#js-input-promotion').val(),
+                        quantity: {
+                            min: $module.find('#js-input-quantity-min').val(),
+                            max: $module.find('#js-input-quantity-max').val()
+                        },
+                        search: $module.find('#js-input-search').val(),
+                        attributes: $module.find('#js-input-attribute').val(),
+                        features: $module.find('#js-input-feature').val(),
+                        start_date: $module.find('#js-input-start-date').val(),
+                        expiration_date: $module.find('#js-input-expiration-date').val(),
+                        days_left: $module.find('#js-input-days-left').val(),
+                        usage_left: $module.find('#js-input-usage-left').val(),
+                        status: $module.find('#js-input-status').val()
+                    };
+
+                    data.start = data.start || 0;
+                }
+            },
+            columnDefs: [
+                {
+                    targets: 0,
+                    orderable: false,
+                    searchable: false,
+                    className: "text-center",
+                    render: function (data, type, row) {
+                        return '<input type="checkbox" class="select_coupon" data-id="' + row[0]["coupon_ids"] + '">';
+                    }
+                },
+                {
+                    targets: 1,
+                    render: function (data) {
+                        return data;
+                    }
+                },
+                {
+                    targets: 2,
+                    render: function (data) {
+                        return data;
+                    }
+                },
+                {
+                    targets: 3,
+                    className: "text-center",
+                    render: function (data) {
+                        return data;
+                    }
+                },
+                {
+                    targets: 4,
+                    render: function (data) {
+                        return data;
+                    }
+                },
+                {
+                    targets: 5,
+                    render: function (data) {
+                        return data;
+                    }
+                },
+                {
+                    targets: 6,
+                    orderable: false,
+                    className: "text-center",
+                    render: function (data) {
+                        if (parseInt(data) <= 0) {
+                            return '<span class="label label-default">Expiré</span>';
+                        } else {
+                            return data + ' jours';
+                        }
+                    }
+                },
+                {
+                    targets: 7,
+                    orderable: false,
+                    className: "text-center",
+                    render: function (data) {
+                        if (data === -1) {
+                            // Coupon illimité
+                            return '<span class="label label-success">Illimité</span>';
+                        } else if (data > 0) {
+                            // Coupon avec des utilisations restantes
+                            return data;
+                        } else if (data === 0 || data === '0' || data === null || data === undefined) {
+                            // Coupon épuisé ou aucune valeur
+                            return '<span class="label label-danger">Épuisé</span>';
+                        } else {
+                            // Cas de sécurité pour toute autre valeur inattendue
+                            return '<span class="label label-warning">Inconnu</span>';
+                        }
+                    }
+                },
+                {
+                    targets: 8,
+                    title: 'Actions',
+                    orderable: false,
+                    searchable: false,
+                    className: "text-center",
+                    render: function (data, type, row) {
+                        return '<a href="#" class="btn btn-primary js-edit-coupon" data-id="' + row[0]["coupon_ids"] + '">' +
+                            '<i class="glyphicon glyphicon-pencil"></i></a>' +
+                            ' <a href="#" class="btn btn-danger js-action-delete" data-id="' + row[0]["coupon_ids"] + '">' +
+                            '<i class="glyphicon glyphicon-trash"></i></a>';
+                    }
+                }
+            ],
+            language: {
+                "sProcessing": "Traitement en cours...",
+                "sZeroRecords": "Aucun élément à afficher",
+                "sEmptyTable": "Aucune donnée disponible dans le tableau",
+                "oPaginate": {
+                    "sFirst": "Premier",
+                    "sPrevious": "Précédent",
+                    "sNext": "Suivant",
+                    "sLast": "Dernier"
+                }
+            }
+        });
+
+        // Rafraîchissement automatique du tableau
+        $module.find('.js-refresh-table').on('change keyup', function () {
+            table.ajax.reload();
+        });
+
+        // Sélection/Désélection de tous les coupons
+        $('#select-all').on('click', function () {
+            var rows = table.rows({ 'search': 'applied' }).nodes();
+            $('input[type="checkbox"]', rows).prop('checked', this.checked);
+        });
+
+        // Suppression des coupons sélectionnés
+        $('#delete-selected-items').on('click', function () {
+            var selectedIds = [];
+            $('.select_coupon:checked').each(function () {
+                selectedIds.push($(this).data('id'));
+            });
+
+            if (selectedIds.length > 0) {
+                $('#modal-delete-selected').modal('show');
+            } else {
+                alert('Aucun coupon sélectionné.');
+            }
+        });
+
+        $('#confirm-delete-selected').on('click', function () {
+            var selectedIds = [];
+            $('.select_coupon:checked').each(function () {
+                selectedIds.push($(this).data('id'));
+            });
+
+            if (selectedIds.length > 0) {
+                $.ajax({
+                    url: "{url path='/admin/easy-coupon-manager/delete-selected'}",
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ coupon_ids: selectedIds }),
+                    success: function () {
+                        table.ajax.reload(null, false);
+                        $('#modal-delete-selected').modal('hide');
+                        $('#select-all').prop('checked', false);  // Désélectionner la case globale
+                    },
+                    error: function () {
+                        alert('Une erreur est survenue lors de la suppression.');
+                    }
+                });
+            }
+        });
+
+        // Modification d'un coupon
+        $module.on('click', '.js-edit-coupon', function (e) {
+            e.preventDefault();
+            var couponId = $(this).data('id');
+            window.location.href = "{url path='/admin/coupon/update/'}" + couponId;
+        });
+
+        // Suppression individuelle
+        $module.on('click', '.js-action-delete', function (e) {
+            e.preventDefault();
+
+            var couponId = $(this).data('id'); // Récupère l'ID depuis data-id
+
+            if (confirm("Voulez-vous vraiment supprimer ce coupon ?")) {
+                $.ajax({
+                    url: "{url path='/admin/easy-coupon-manager/delete'}",
+                    method: 'POST',
+                    data: { coupon_id: couponId }, // Envoi de l'ID en POST
+                    success: function () {
+                        $('.js-list').DataTable().ajax.reload(null, false); // Rafraîchit la table
+                    },
+                    error: function () {
+                        alert("Erreur lors de la suppression du coupon.");
+                    }
+                });
+            }
+        });
+
+        // Fonction pour mettre à jour le statut des coupons
+        function updateCouponStatus(status) {
+            var selectedIds = [];
+            $('.select_coupon:checked').each(function () {
+                selectedIds.push($(this).data('id'));
+            });
+
+            if (selectedIds.length > 0) {
+                $.ajax({
+                    url: "{url path='/admin/easy-coupon-manager/update-status'}",
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        coupon_ids: selectedIds,
+                        status: status
+                    }),
+                    success: function () {
+                        table.ajax.reload(null, false);  // Rafraîchir sans perdre la pagination
+                        $('#select-all').prop('checked', false);
+                    },
+                    error: function () {
+                        alert("Erreur lors de la mise à jour du statut des coupons.");
+                    }
+                });
+            } else {
+                alert('Aucun coupon sélectionné.');
+            }
+        }
+
+        // Ouvre la modale d'activation
+        $('#activate-selected-items').on('click', function () {
+            var selectedIds = $('.select_coupon:checked');
+            if (selectedIds.length > 0) {
+                $('#modal-activate-selected').modal('show');
+            } else {
+                alert('Aucun coupon sélectionné.');
+            }
+        });
+
+        // Confirme l'activation
+        $('#confirm-activate-selected').on('click', function () {
+            $('#modal-activate-selected').modal('hide');
+            updateCouponStatus(1);  // 1 = Actif
+        });
+
+        // Ouvre la modale de désactivation
+        $('#deactivate-selected-items').on('click', function () {
+            var selectedIds = $('.select_coupon:checked');
+            if (selectedIds.length > 0) {
+                $('#modal-deactivate-selected').modal('show');
+            } else {
+                alert('Aucun coupon sélectionné.');
+            }
+        });
+
+        // Confirme la désactivation
+        $('#confirm-deactivate-selected').on('click', function () {
+            $('#modal-deactivate-selected').modal('hide');
+            updateCouponStatus(0);  // 0 = Inactif
+        });
+
+    })(jQuery, jQuery('#module-easy-coupon-manager'));
+</script>
+{/block}
